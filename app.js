@@ -22,21 +22,28 @@ LOCAL_FS_RPC = 'http://127.0.0.1:8001'
 var processUpdates = async () => {
   r = await FS('receivedAndFailed')
 
-  if (!r.data.receivedAndFailed) return l("No receivedAndFailed")
-    
-  for (var obj of r.data.receivedAndFailed) {
-    if (obj.asset != 1) return // only FRD accepted
 
-    let uid = Buffer.from(obj.invoice, 'hex').toString()
+
+  if (!r.data.receivedAndFailed) return l("No receivedAndFailed")
+
+  for (var obj of r.data.receivedAndFailed) {
+    //if (obj.asset != 1) return // only FRD accepted
+
+    let uid = Buffer.from(obj.invoice, 'hex').slice(1).toString()
+
 
     // checking if uid is valid
     if (users.hasOwnProperty(uid)) {
-      if (obj.is_inward) {
-        l("New deposit to "+uid)
+      l(uid+(obj.is_inward ? ' receive':' refund'), obj)
+
+      // add or create asset balance
+      if (users[uid][obj.asset]) {
+        users[uid][obj.asset] += obj.amount
       } else {
-        l("Refund because failed to withdraw for "+uid)
+        users[uid][obj.asset] = obj.amount
       }
-      users[uid] += obj.amount
+    } else {
+      l('No such user '+uid)
     }
   }
 
@@ -56,22 +63,6 @@ FS = (method, params = {}) => {
 }
 
 
-commy = (b, dot = true) => {
-  let prefix = b < 0 ? '-' : ''
-
-  b = Math.abs(b).toString()
-  if (dot) {
-    if (b.length == 1) {
-      b = '0.0' + b
-    } else if (b.length == 2) {
-      b = '0.' + b
-    } else {
-      var insert_dot_at = b.length - 2
-      b = b.slice(0, insert_dot_at) + '.' + b.slice(insert_dot_at)
-    }
-  }
-  return prefix + b.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
-}
 
 
 httpcb = async (req, res) => {
@@ -79,7 +70,6 @@ httpcb = async (req, res) => {
 
   if (req.headers.cookie) {
     var id = req.headers.cookie.split('id=')[1]
-    l('Loaded id ' + id)
   }
 
   res.status = 200
@@ -91,7 +81,7 @@ httpcb = async (req, res) => {
       res.setHeader('Set-Cookie', 'id=' + id)
       repl.context.res = res
     }
-    if (!users[id]) users[id] = 0 // Math.round(Math.random() * 1000000)
+    if (!users[id]) users[id] = {} // Math.round(Math.random() * 1000000)
 
     res.end(`
 <!DOCTYPE html>
@@ -106,7 +96,9 @@ httpcb = async (req, res) => {
   <script>
   fs_origin = '${LOCAL_FS_RPC}'
   address = '${address}'
-  id = '${id}'
+  invoice = '${id}'
+  user = ${JSON.stringify(users[id])}
+  assets = ${JSON.stringify(assets)}
   </script>
 </head>
 
@@ -114,16 +106,14 @@ httpcb = async (req, res) => {
   <main role="main" class="container" id="main">
     <h1 class="mt-5">Fairlayer Integration Demo (JS)</h1>
     <p>Your account in our service: <span id="yourid"></span></p>
-    <p>Available FRD Balance: <b>\$${commy(users[id])}</b></p>
-
-    <h3>Deposit FRD</h3>
-    <p>Deposit Address: <a href="#" id="deposit"></a></p>
-
-    <h3>Withdraw FRD</h3>
-    <p><input type="text" id="destination" placeholder="Address"></p>
-    <p><input type="text" id="out_amount" placeholder="Amount"></p>
-    <p><button class="btn btn-success" id="withdraw">Withdraw</button></p>
     <a href="https://fairlayer.com/#install">Install Fairlayer</a>
+
+    <p><select id="picker">
+    </select></p>
+    <p>Deposit Address: <a href="#" id="deposit"></a></p>
+    <p><input type="text" id="destination" placeholder="Address"></p>
+    <p><input type="text" id="amount" placeholder="Amount"></p>
+    <p><button class="btn btn-success" id="withdraw">Withdraw</button></p>
  </main>
 </body></html>`)
   } else if (req.url == '/init') {
@@ -136,20 +126,22 @@ httpcb = async (req, res) => {
       var p = JSON.parse(queryData)
 
       if (p.destination) {
-        var amount = Math.round(parseFloat(p.out_amount) * 100)
+        var amount = Math.round(parseFloat(p.amount) * 100)
 
-        if (users[id] < amount) {
-          l('Not enough balance')
+        if (!users[id][p.asset] || users[id][p.asset] < amount) {
+          l('Not enough balance: ', users[id], p.asset)
           return false
         }
-        users[id] -= amount
+        users[id][p.asset] -= amount
         r = await FS('send', {
           destination: p.destination,
           amount: amount,
           invoice: id,
-          asset: 1
+          asset: p.asset
         })
         l(r.data)
+
+        // if fail, do not withdraw?
         res.end(JSON.stringify({status: 'paid'}))
       }
     })
@@ -177,6 +169,12 @@ init = async () => {
   }
 
   address = r.data.address
+  assets = r.data.assets
+  
+  // assets you support
+  whitelist = [1, 2]
+  assets = assets.filter(a=>whitelist.includes(a.id))
+
   l('Our address: ' + address)
   processUpdates()
 
@@ -185,9 +183,10 @@ init = async () => {
     .createServer(httpcb)
     .listen(3010)
 
+  /*
   try{
     require('../lib/opn')('http://127.0.0.1:3010')
-  } catch(e){} 
+  } catch(e){} */
 }
 
 init()

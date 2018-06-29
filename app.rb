@@ -1,6 +1,8 @@
 # fair SDK demo for ruby + sinatra
 
 require 'sinatra'
+require "sinatra/cookies"
+
 require 'json'
 require 'open-uri'
 
@@ -16,7 +18,7 @@ else
 end
 
 
-
+users = {}
 
 if File.exists? FS_PATH + '/pk.json'
   $auth_code = JSON.parse(File.read(FS_PATH + '/pk.json'))['auth_code']
@@ -34,11 +36,14 @@ if File.exists? FS_PATH + '/pk.json'
     address = data['address']
   end
 
-  def processUpdates
-    puts fair('method=receivedAndFailed')
+  # equivalent for setInterval
+  Thread.new do
+    loop do 
+      sleep 1
+      puts fair('method=receivedAndFailed')
+    end
   end
-  
-  processUpdates
+
 
 else
   p "No auth"
@@ -46,10 +51,10 @@ end
 
 
 
-
-
 get '/' do
-  request.cookies[:id] ||= rand(999999)
+  cookies[:id] ||= rand(999999)
+  id = cookies[:id]
+  users[id] ||= 0
 
 
   r =<<HTML
@@ -65,7 +70,7 @@ get '/' do
   <script>
   fs_origin = '#{fs_origin}'
   address = '#{address}'
-  id = '#{request.cookies[:id]}'
+  id = '#{id}'
   </script>
 </head>
 
@@ -73,7 +78,7 @@ get '/' do
   <main role="main" class="container" id="main">
     <h1 class="mt-5">Fairlayer Integration Demo (Ruby)</h1>
     <p>Your account in our service: <span id="yourid"></span></p>
-    <p>Available FRD Balance: <b>\$${commy(users[id])}</b></p>
+    <p>Available FRD Balance: <b>\$#{'%.2f' % users[id]}</b></p>
 
     <h3>Deposit FRD</h3>
     <p>Deposit Address: <a href="#" id="deposit"></a></p>
