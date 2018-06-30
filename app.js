@@ -7,22 +7,23 @@ rand = () => crypto.randomBytes(6).toString('hex')
 fs = require('fs')
 users = {}
 
+process.on('unhandledRejection', l)
+process.on('uncaughtException', l)
 
 // define merchant node path
-FS_RPC = 'http://127.0.0.1:8002/rpc'
 if (fs.existsSync('/root/fs/data8002/offchain/pk.json')) {
   FS_PATH = '/root/fs/data8002/offchain'
+  FS_RPC = 'http://127.0.0.1:8202/rpc'
 } else {
   FS_PATH = '/Users/homakov/work/fs/data8002/offchain'
+  FS_RPC = 'http://127.0.0.1:8002/rpc'
 }
 
 // pointing browser SDK to user node
 LOCAL_FS_RPC = 'http://127.0.0.1:8001'
 
-var processUpdates = async () => {
+processUpdates = async () => {
   r = await FS('receivedAndFailed')
-
-
 
   if (!r.data.receivedAndFailed) return l("No receivedAndFailed")
 
@@ -30,7 +31,6 @@ var processUpdates = async () => {
     //if (obj.asset != 1) return // only FRD accepted
 
     let uid = Buffer.from(obj.invoice, 'hex').slice(1).toString()
-
 
     // checking if uid is valid
     if (users.hasOwnProperty(uid)) {
@@ -76,12 +76,12 @@ httpcb = async (req, res) => {
 
   if (req.url == '/') {
     if (!id) {
-      id = rand()
+      id = Math.round(Math.random() * 10000000) //rand()
       l('Set cookie')
       res.setHeader('Set-Cookie', 'id=' + id)
       repl.context.res = res
     }
-    if (!users[id]) users[id] = {} // Math.round(Math.random() * 1000000)
+    if (!users[id]) users[id] = {}
 
     res.end(`
 <!DOCTYPE html>
@@ -105,15 +105,21 @@ httpcb = async (req, res) => {
 <body>
   <main role="main" class="container" id="main">
     <h1 class="mt-5">Fairlayer Integration Demo (JS)</h1>
-    <p>Your account in our service: <span id="yourid"></span></p>
-    <a href="https://fairlayer.com/#install">Install Fairlayer</a>
 
+    <p>Your account in this service: <span id="yourid"></span></p>
     <p><select id="picker">
     </select></p>
     <p>Deposit Address: <a href="#" id="deposit"></a></p>
-    <p><input type="text" id="destination" placeholder="Address"></p>
+    <p><input type="text" id="destination" placeholder="Withdraw Address"></p>
     <p><input type="text" id="amount" placeholder="Amount"></p>
     <p><button class="btn btn-success" id="withdraw">Withdraw</button></p>
+
+    <p><b>How to play with it?</b></p>
+    <p>1. <a href="https://fairlayer.com/#install">Install Fairlayer</a></p>
+    <p>2. Buy some Fair assets or use Testnet Faucet inside the wallet</p>
+    <p>3. Select an asset and click on deposit address to send arbitrary amount</p>
+    <p>4. ... (trade or somehow use the asset within the app)</p>
+    <p>5. Withdraw the asset from demoapp to your wallet or other app</p>
  </main>
 </body></html>`)
   } else if (req.url == '/init') {
