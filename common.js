@@ -2,7 +2,7 @@
 l=console.log
 
 var fallback = setTimeout(()=>{
-//main.innerHTML="Couldn't connect to local node at "+fs_origin+". <a href='https://fairlayer.com/#install'>Please install Fairlayer first</a>"
+//main.innerHTML="Couldn't connect to local node at "+fair_origin+". <a href='https://fairlayer.com/#install'>Please install Fairlayer first</a>"
 }, 3000)
 
 
@@ -23,14 +23,26 @@ commy = (b, dot = true) => {
   return prefix + b.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
 }
 
+escapeHTML = (str)=>{
+  var tagsToReplace = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;'
+  }
+  return str.replace(/[&<>]/g, function(tag) {
+      return tagsToReplace[tag] || tag;
+  });
+}
+
+
 window.onload = function(){
   // invoice can also be included as #hash to the address
-  deposit.innerHTML = address + '#' + invoice
+  deposit.innerHTML = our_address + '#' + invoice
   yourid.innerHTML = invoice
 
   var opts = '<option disabled>Select Fair asset to operate with</option>'
   for (var a of assets) {
-    opts += `<option value="${a.id}">${a.ticker}: ${user[a.id] ? commy(user[a.id]) : '0.00'}</option>`
+    opts += `<option value="${a.id}">${escapeHTML(a.name)} (${escapeHTML(a.ticker)}): ${user[a.id] ? commy(user[a.id]) : '0.00'}</option>`
   }
 
   picker.innerHTML = opts
@@ -39,7 +51,7 @@ window.onload = function(){
 
   withdraw.onclick = function(){
     axios.post('/init', {
-      destination: destination.value,
+      address: address.value,
       amount: amount.value,
       asset: parseInt(picker.value)
     }).then((r)=>{
@@ -53,17 +65,17 @@ window.onload = function(){
   }
 
   deposit.onclick = function(){
-    fs_w = window.open(fs_origin+'#wallet?address='+address+'&invoice='+invoice+'&editable=amount&asset='+picker.value)
+    fair_w = window.open(fair_origin+'#wallet?address='+our_address+'&invoice='+invoice+'&asset='+picker.value+'&editable=amount')
 
     window.addEventListener('message', function(e){
-      if(e.origin != fs_origin) return
+      if(e.origin != fair_origin) return
 
       // the wallet claims the payment has gone through
       if (e.data.status == 'paid') {
-        fs_w.close()
+        fair_w.close()
         setTimeout(()=>{
           location.reload()
-        }, 1000)
+        }, 1300)
       } else if (e.data.status == 'login') {
         // login token shared
       }

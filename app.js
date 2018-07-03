@@ -11,19 +11,19 @@ process.on('unhandledRejection', l)
 process.on('uncaughtException', l)
 
 // define merchant node path
-if (fs.existsSync('/root/fs/data8002/offchain/pk.json')) {
-  FS_PATH = '/root/fs/data8002/offchain'
-  FS_RPC = 'http://127.0.0.1:8202/rpc'
+if (fs.existsSync('/root/fair/data8002/offchain/pk.json')) {
+  fair_path = '/root/fair/data8002/offchain'
+  our_fair_rpc = 'http://127.0.0.1:8202/rpc'
 } else {
-  FS_PATH = '/Users/homakov/work/fs/data8002/offchain'
-  FS_RPC = 'http://127.0.0.1:8002/rpc'
+  fair_path = '/Users/homakov/work/fair/data8002/offchain'
+  our_fair_rpc = 'http://127.0.0.1:8002/rpc'
 }
 
 // pointing browser SDK to user node
-LOCAL_FS_RPC = 'http://127.0.0.1:8001'
+local_fair_rpc = 'http://127.0.0.1:8001'
 
 processUpdates = async () => {
-  r = await FS('receivedAndFailed')
+  r = await Fair('receivedAndFailed')
 
   if (!r.data.receivedAndFailed) return l("No receivedAndFailed")
 
@@ -54,8 +54,8 @@ post = async (url, params) => {
   return new Promise((resolve) => {})
 }
 
-FS = (method, params = {}) => {
-  return axios.post(FS_RPC, {
+Fair = (method, params = {}) => {
+  return axios.post(our_fair_rpc, {
     method: method,
     auth_code: auth_code,
     params: params
@@ -94,11 +94,11 @@ httpcb = async (req, res) => {
   <title>Fairlayer Integration Demo</title>
 
   <script>
-  fs_origin = '${LOCAL_FS_RPC}'
-  address = '${address}'
+  fair_origin = '${local_fair_rpc}'
+  our_address = '${our_address}'
   invoice = '${id}'
   user = ${JSON.stringify(users[id])}
-  assets = ${JSON.stringify(assets)}
+  assets = ${JSON.stringify(assets).replace("/",'\\/')}
   </script>
 </head>
 
@@ -110,7 +110,7 @@ httpcb = async (req, res) => {
     <p><select id="picker">
     </select></p>
     <p>Deposit Address: <a href="#" id="deposit"></a></p>
-    <p><input type="text" id="destination" placeholder="Withdraw Address"></p>
+    <p><input type="text" id="address" placeholder="Withdraw Address"></p>
     <p><input type="text" id="amount" placeholder="Amount"></p>
     <p><button class="btn btn-success" id="withdraw">Withdraw</button></p>
 
@@ -120,6 +120,7 @@ httpcb = async (req, res) => {
     <p>3. Select an asset and click on deposit address to send arbitrary amount</p>
     <p>4. ... (trade or somehow use the asset within the app)</p>
     <p>5. Withdraw the asset from demoapp to your wallet or other app</p>
+    <p>6. <a href="https://github.com/fairlayer/demos">Read sources</a>. <a href="https://github.com/fairlayer/fair/blob/master/wiki/9_receive_and_pay.md">Implement receive/pay API on your own service</a></p>
  </main>
 </body></html>`)
   } else if (req.url == '/init') {
@@ -131,7 +132,7 @@ httpcb = async (req, res) => {
     req.on('end', async function() {
       var p = JSON.parse(queryData)
 
-      if (p.destination) {
+      if (p.address) {
         var amount = Math.round(parseFloat(p.amount) * 100)
 
         if (!users[id][p.asset] || users[id][p.asset] < amount) {
@@ -139,8 +140,8 @@ httpcb = async (req, res) => {
           return false
         }
         users[id][p.asset] -= amount
-        r = await FS('send', {
-          destination: p.destination,
+        r = await Fair('send', {
+          address: p.address,
           amount: amount,
           invoice: id,
           asset: p.asset
@@ -160,28 +161,28 @@ httpcb = async (req, res) => {
 
 init = async () => {
 
-  if (fs.existsSync(FS_PATH + '/pk.json')) {
-    auth_code = JSON.parse(fs.readFileSync(FS_PATH + '/pk.json')).auth_code
+  if (fs.existsSync(fair_path + '/pk.json')) {
+    auth_code = JSON.parse(fs.readFileSync(fair_path + '/pk.json')).auth_code
     l('Auth code to our node: ' + auth_code)
   } else {
     l("No auth")
     return setTimeout(init, 1000)
   }
 
-  r = await FS('getinfo')
+  r = await Fair('getinfo')
   if (!r.data.address) {
     l('No address')
     return setTimeout(init, 1000)
   }
 
-  address = r.data.address
+  our_address = r.data.address
   assets = r.data.assets
   
   // assets you support
   whitelist = [1, 2]
   assets = assets.filter(a=>whitelist.includes(a.id))
 
-  l('Our address: ' + address)
+  l('Our address: ' + our_address)
   processUpdates()
 
 
